@@ -3,7 +3,7 @@ from tensorflow.python.keras.regularizers import l2
 from collections import defaultdict
 from utils import Hash
 from itertools import chain
-from sequence import SequencePoolingLayer
+from sequence import SequencePoolingLayer,WeightedSequenceLayer
 def create_embedding_dict(sparse_feature_columns, varlen_sparse_feature_columns, seed, l2_reg,
                           prefix='sparse_', seq_mask_zero=True):
     '''
@@ -140,10 +140,23 @@ def get_varlen_pool_list(embedding_dict,features,varlen_sparse_feature_columns,t
         combiner=fc.combiner
         if feature_length_name is not None:
             if fc.weight_name is not None:
-                pass
+                seq_input=WeightedSequenceLayer(weight_normalization=fc.weight_norm)(
+                    [embedding_dict[feature_nanme],features[fc.weight_name]])
 
             else:
                 seq_input=embedding_dict[feature_nanme]
             vec=SequencePoolingLayer(combiner,supports_masking=False)([seq_input,features[feature_length_name]])
+        else:
+            if fc.weight_name is not None:
+                seq_input=WeightedSequenceLayer(weight_normalization=fc.weight_norm,supports_masking=True)(
+                embedding_dict[feature_nanme],features[fc.weight_name])
+            else:
+                seq_input=embedding_dict[feature_nanme]
+            vec=SequencePoolingLayer(combiner,supports_masking=True)(seq_input)
+        pool_vec_list[fc.group_name].append(vec)
+    if to_list:
+        return list(chain.from_iterable(pool_vec_list.values()))
+    return pool_vec_list
+
 
 

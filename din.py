@@ -1,6 +1,7 @@
 from feature_column import build_input_features, SparseFeat, VarLenSparseFeat, DenseFeat
 from inputs import create_embedding_matrix,embedding_lookup,get_dense_input,get_varlen_pool_list,varlen_embedding_lookup
-
+from utils import concat_func
+from sequence import AttentionSequencePoolingLayer
 def DIN(dnn_feature_columns, history_feature_list, dnn_use_bn=False,
         dnn_hidden_units=(200, 80), dnn_activation='relu', att_hidden_size=(80, 40), att_activation="dice",
         att_weight_normalization=False, l2_reg_dnn=0, l2_reg_embedding=1e-6, dnn_dropout=0, seed=1024,
@@ -45,10 +46,14 @@ def DIN(dnn_feature_columns, history_feature_list, dnn_use_bn=False,
 
     embedding_dict=create_embedding_matrix(dnn_feature_columns,l2_reg_embedding,seed,prefix='')
     #这两个要参与atention的计算
+    '''
+        - query is a 3D tensor with shape:  ``(batch_size, 1, embedding_size)``
 
+        - keys is a 3D tensor with shape:   ``(batch_size, T, embedding_size)``
+    '''
     query_emb_list=embedding_lookup(embedding_dict,features,sparse_feature_columns,history_feature_list,history_feature_list,to_list=True)
     key_emb_list=embedding_lookup(embedding_dict,features,history_feature_columns,his_fc_names,his_fc_names, to_list=True)
-    #dnn所有离散特征 和query_emd 还有 key_emb共用embedding层
+    # query和dnn_input_emb共用embedding
     dnn_input_embedding_list=embedding_lookup(embedding_dict,features,sparse_feature_columns,mask_feat_list=history_feature_list, to_list=True)
     dense_value_list=get_dense_input(features,dense_feature_columns)
 
@@ -56,8 +61,14 @@ def DIN(dnn_feature_columns, history_feature_list, dnn_use_bn=False,
 
     sequence_embed_list = get_varlen_pool_list(sequence_embedding_dict, features, varlen_sparse_feature_columns,
                                                   to_list=True)
-
+    #除了需要attention以外的所有离散特征 包括VarLenSparseFeat
     dnn_input_embedding_list += sequence_embed_list
+    keys_emb=concat_func(key_emb_list,mask=True)
+    deep_input_emb=concat_func(dnn_input_embedding_list)
+    query_emb=concat_func(query_emb_list,mask=True)
+    hist=AttentionSequencePoolingLayer(att_hidden_size,att_activation,weight_normalization=att_weight_normalization,supports_masking=True)([
+        query_emb,keys_emb
+    ])
 
 
 
