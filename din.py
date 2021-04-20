@@ -1,6 +1,9 @@
 from feature_column import build_input_features, SparseFeat, VarLenSparseFeat, DenseFeat
 from inputs import create_embedding_matrix,embedding_lookup,get_dense_input,get_varlen_pool_list,varlen_embedding_lookup
 from utils import concat_func
+import tensorflow as tf
+from core import DNN,PredictionLayer
+from utils import NoMask,combine_dnn_input
 from sequence import AttentionSequencePoolingLayer
 def DIN(dnn_feature_columns, history_feature_list, dnn_use_bn=False,
         dnn_hidden_units=(200, 80), dnn_activation='relu', att_hidden_size=(80, 40), att_activation="dice",
@@ -43,7 +46,7 @@ def DIN(dnn_feature_columns, history_feature_list, dnn_use_bn=False,
             history_feature_columns.append(fc)
         else:
             sparse_varlen_columns.append(fc)
-
+    inputs_list = list(features.values())
     embedding_dict=create_embedding_matrix(dnn_feature_columns,l2_reg_embedding,seed,prefix='')
     #这两个要参与atention的计算
     '''
@@ -69,6 +72,14 @@ def DIN(dnn_feature_columns, history_feature_list, dnn_use_bn=False,
     hist=AttentionSequencePoolingLayer(att_hidden_size,att_activation,weight_normalization=att_weight_normalization,supports_masking=True)([
         query_emb,keys_emb
     ])
+    deep_input_emb=tf.keras.layers.Concatenate()([NoMask()(deep_input_emb),hist])
+    deep_input_emb = tf.keras.layers.Flatten()(deep_input_emb)
+    dnn_input = combine_dnn_input([deep_input_emb], dense_value_list)
+    output = DNN(dnn_hidden_units, dnn_activation, l2_reg_dnn, dnn_dropout, dnn_use_bn, seed=seed)(dnn_input)
+    final_logit = tf.keras.layers.Dense(1, use_bias=False,
+                                        kernel_initializer=tf.keras.initializers.glorot_normal(seed))(output)
 
+    output = PredictionLayer(task)(final_logit)
 
-
+    model = tf.keras.models.Model(inputs=inputs_list, outputs=output)
+    return model

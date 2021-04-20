@@ -36,3 +36,6 @@ if __name__ == "__main__":
     x, y, feature_columns, behavior_feature_list = get_xy_fd()
     print('?????????')
     model = DIN(feature_columns, behavior_feature_list)
+    model.compile('adam', 'binary_crossentropy',
+                  metrics=['binary_crossentropy'])
+    history = model.fit(x, y, verbose=1, epochs=10, validation_split=0.5)
