@@ -4,6 +4,7 @@ from collections import defaultdict
 from utils import Hash
 from itertools import chain
 from sequence import SequencePoolingLayer,WeightedSequenceLayer
+#from regular import Embedding_DIN,set_AdapativeL2
 def create_embedding_dict(sparse_feature_columns, varlen_sparse_feature_columns, seed, l2_reg,
                           prefix='sparse_', seq_mask_zero=True):
     '''
@@ -109,7 +110,7 @@ def get_dense_input(features,feature_columns):
         else:
             tran_result=Lambda(fc.transform_fn)(features[fc.name])
             dense_input_list.append(tran_result)
-        return dense_input_list
+    return dense_input_list
 
 def varlen_embedding_lookup(embedding_dict, sequence_input_dict, varlen_sparse_feature_columns):
     '''

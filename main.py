@@ -1,41 +1,96 @@
-from feature_column import SparseFeat, VarLenSparseFeat, DenseFeat, get_feature_names
+from utils import to_df,build_map
+import pickle
 import numpy as np
-from din import DIN
-
-
-def get_xy_fd():
-    feature_columns = [SparseFeat('user', 3, embedding_dim=10), SparseFeat(
-        'gender', 2, embedding_dim=4), SparseFeat('item_id', 3 + 1, embedding_dim=8),
-                       SparseFeat('cate_id', 2 + 1, embedding_dim=4), DenseFeat('pay_score', 1)]
-    feature_columns += [
-        VarLenSparseFeat(SparseFeat('hist_item_id', vocabulary_size=3 + 1, embedding_dim=8, embedding_name='item_id'),
-                         maxlen=4, length_name="seq_length"),
-        VarLenSparseFeat(SparseFeat('hist_cate_id', 2 + 1, embedding_dim=4, embedding_name='cate_id'), maxlen=4,
-                         length_name="seq_length")]
-    # Notice: History behavior sequence feature name must start with "hist_".
-    behavior_feature_list = ["item_id", "cate_id"]
-    uid = np.array([0, 1, 2])
-    ugender = np.array([0, 1, 0])
-    iid = np.array([1, 2, 3])  # 0 is mask value
-    cate_id = np.array([1, 2, 2])  # 0 is mask value
-    pay_score = np.array([0.1, 0.2, 0.3])
-
-    hist_iid = np.array([[1, 2, 3, 0], [3, 2, 1, 0], [1, 2, 0, 0]])
-    hist_cate_id = np.array([[1, 2, 2, 0], [2, 2, 1, 0], [1, 2, 0, 0]])
-    seq_length = np.array([3, 3, 2])  # the actual length of the behavior sequence
-
-    feature_dict = {'user': uid, 'gender': ugender, 'item_id': iid, 'cate_id': cate_id,
-                    'hist_item_id': hist_iid, 'hist_cate_id': hist_cate_id,
-                    'pay_score': pay_score, 'seq_length': seq_length}
-    x = {name: feature_dict[name] for name in get_feature_names(feature_columns)}
-    y = np.array([1, 0, 1])
-    return x, y, feature_columns, behavior_feature_list
-
+import random
+from test_function import test_DIN
 
 if __name__ == "__main__":
-    x, y, feature_columns, behavior_feature_list = get_xy_fd()
-    print('?????????')
-    model = DIN(feature_columns, behavior_feature_list)
-    model.compile('adam', 'binary_crossentropy',
-                  metrics=['binary_crossentropy'])
-    history = model.fit(x, y, verbose=1, epochs=10, validation_split=0.5)
+
+    folder=r"D:\Amozon_data_set"
+    '''
+    reviews_Electronics=folder+r"\Electronics_5.json"
+    meta_Electronics=folder+r"\meta_Electronics.json"
+    
+    reviews_df=to_df(reviews_Electronics)
+    with open(folder+r"\reviews.pkl","wb") as f:
+        pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL)
+    meta_df=to_df(meta_Electronics)
+    meta_df=meta_df[meta_df['asin'].isin(reviews_df['asin'].unique())]
+    meta_df=meta_df.reset_index(drop=True)
+    with open(folder+r'\meta.pkl','wb') as f:
+        pickle.dump(meta_df,f,pickle.HIGHEST_PROTOCOL)
+    with open(folder+r"\reviews.pkl","rb") as f:
+        reviews_df=pickle.load(f)
+        #选取三列 分别为用户id 商品id 和时间戳
+        reviews_df=reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
+    with open(folder+r'\meta.pkl','rb') as f:
+        meta_df=pickle.load(f)
+        meta_df=meta_df[['asin','categories']]
+        #类别只保留最后一个
+        meta_df['categories']=meta_df['categories'].map(lambda x:x[-1][-1])
+
+    asin_map,asin_key=build_map(meta_df,'asin')
+    cate_map,cate_key=build_map(meta_df,'categories')
+    revi_map,revi_key=build_map(reviews_df,'reviewerID')
+    user_count, item_count, cate_count, example_count = \
+        len(revi_map), len(asin_map), len(cate_map), reviews_df.shape[0]
+    print('user_count: %d\titem_count: %d\tcate_count: %d\texample_count: %d' %
+          (user_count, item_count, cate_count, example_count))
+    meta_df = meta_df.sort_values('asin')
+    meta_df = meta_df.reset_index(drop=True)
+    reviews_df['asin'] = reviews_df['asin'].map(lambda x: asin_map[x])
+    reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
+    reviews_df = reviews_df.reset_index(drop=True)
+    reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
+    cate_list = np.array(meta_df['categories'], dtype='int32')
+    with open(folder+r"/remap.pkl",'wb') as f:
+        pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL)  # uid, iid
+        pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)  # cid of iid line
+        pickle.dump((user_count, item_count, cate_count, example_count),
+                    f, pickle.HIGHEST_PROTOCOL)
+        pickle.dump((asin_key, cate_key, revi_key), f, pickle.HIGHEST_PROTOCOL)
+
+
+    with open(folder+r'/remap.pkl','rb') as f:
+        reviews_df=pickle.load(f)
+        cate_list=pickle.load(f)
+        user_count,item_count,cate_count,example_count=pickle.load(f)
+
+    train_set=[]
+    test_set=[]
+    print(reviews_df.columns)
+    for reviewerID,hist in reviews_df.groupby('reviewerID'):
+        pos_list=hist['asin'].tolist()
+        def gen_neg():
+            neg=pos_list[0]
+            while neg in pos_list:
+                neg=random.randint(0,item_count-1)
+            return neg
+
+        neg_list=[gen_neg()for i in range(len(pos_list))]
+        for i in range(1,len(pos_list)):
+            hist=pos_list[:i]
+            if i!=len(pos_list)-1:
+                train_set.append((reviewerID,hist,pos_list[i],1))
+                train_set.append((reviewerID,hist,neg_list[i],0))
+            else:
+                test_set.append((reviewerID,hist,pos_list[i],1))
+                test_set.append((reviewerID,hist,neg_list[i],0))
+
+    random.shuffle(train_set)
+    random.shuffle(test_set)
+    with open(folder+r"/dataset.pkl",'wb') as f:
+        pickle.dump(train_set,f,pickle.HIGHEST_PROTOCOL)
+        pickle.dump(test_set, f, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
+        pickle.dump((user_count, item_count, cate_count), f, pickle.HIGHEST_PROTOCOL)
+    '''
+    test_DIN()
+
+
+
+
+
+
+
+

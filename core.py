@@ -132,6 +132,9 @@ class LocalActivationUnit(Layer):
         self.supports_masking = True
 
     def build(self, input_shape):
+        '''
+        这些检验是非常必要的因为query和key并不公用embedding矩阵
+        '''
         if not isinstance(input_shape, list) or len(input_shape) != 2:
             raise ValueError('A `LocalActivationUnit` layer should be called '
                              'on a list of 2 inputs')
