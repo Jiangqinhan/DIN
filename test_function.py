@@ -4,6 +4,13 @@ from din import DIN
 import pickle
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 from tensorflow.python.keras import metrics
+from tensorflow.python.keras.models import load_model
+from tensorflow.train import Checkpoint
+from tensorflow import trainable_variables
+
+
+folder = r"D:\Amozon_data_set"
+
 
 def get_xy_fd():
     feature_columns = [SparseFeat('user', 3, embedding_dim=10), SparseFeat(
@@ -34,7 +41,6 @@ def get_xy_fd():
     return x, y, feature_columns, behavior_feature_list
 
 def get_config():
-    folder = r"D:\Amozon_data_set"
     with open(folder + r"/dataset.pkl", 'rb') as f:
         train_set=pickle.load(f)
         test_set=pickle.load(f)
@@ -57,13 +63,21 @@ def get_config():
 
 
 def test_DIN():
-    x, y, feature_columns, behavior_feature_list = get_config() #get_xy_fd()
+    x, y, feature_columns, behavior_feature_list = get_xy_fd()# get_config()
     print('?????????')
-
     model = DIN(feature_columns, behavior_feature_list)
+    t_vars = trainable_variables()
+    for var in t_vars:
+        print(var.name)
+    model.summary()
+    '''
+    model.load_weights(folder+r'/param/my_model')
     model.compile('adam', 'binary_crossentropy',
                   metrics=[metrics.binary_accuracy])
-    history = model.fit(x, y, verbose=1, epochs=5, validation_split=0.5,batch_size=64)
+
+    history = model.fit(x, y, verbose=1, epochs=1, validation_split=0.1,batch_size=64)
+    #model.save_weights(folder+r'/param/my_model')
+    '''
 
 
 
