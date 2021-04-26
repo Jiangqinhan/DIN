@@ -2,7 +2,7 @@ from utils import to_df,build_map
 import pickle
 import numpy as np
 import random
-from test_function import test_DIN
+from test_function import test_DIN,test_DeepFM
 
 if __name__ == "__main__":
 
@@ -85,7 +85,8 @@ if __name__ == "__main__":
         pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
         pickle.dump((user_count, item_count, cate_count), f, pickle.HIGHEST_PROTOCOL)
     '''
-    test_DIN()
+    #test_DIN()
+    test_DeepFM()
 
 
 

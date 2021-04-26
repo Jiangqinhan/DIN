@@ -203,7 +203,7 @@ class PredictionLayer(Layer):
     def call(self,inputs,**kwargs):
         x=inputs
         if self.use_bias:
-            x=tf.nn.bias_add(x,self.global_bias)
+            x=tf.nn.bias_add(x,self.global_bias, data_format='NHWC')
         if self.task == "binary":
             x = tf.sigmoid(x)
 
@@ -217,3 +217,5 @@ class PredictionLayer(Layer):
         config = {'task': self.task, 'use_bias': self.use_bias}
         base_config = super(PredictionLayer, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+

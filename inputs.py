@@ -102,14 +102,15 @@ def get_dense_input(features,feature_columns):
     :return:[Input]
     '''
     from feature_column import DenseFeat
-    dense_feature_list=list(filter(lambda x:isinstance(x,DenseFeat),feature_columns))
+    dense_feature_list=list(filter(lambda x:isinstance(x,DenseFeat),feature_columns)) if feature_columns else []
     dense_input_list=[]
-    for fc in dense_feature_list:
-        if fc.transform_fc is None:
-            dense_input_list.append(features[fc.name])
-        else:
-            tran_result=Lambda(fc.transform_fn)(features[fc.name])
-            dense_input_list.append(tran_result)
+    if dense_feature_list and len(dense_feature_list) > 0:
+        for fc in dense_feature_list:
+            if fc.transform_fc is None:
+                dense_input_list.append(features[fc.name])
+            else:
+                tran_result = Lambda(fc.transform_fn)(features[fc.name])
+                dense_input_list.append(tran_result)
     return dense_input_list
 
 def varlen_embedding_lookup(embedding_dict, sequence_input_dict, varlen_sparse_feature_columns):
@@ -158,6 +159,20 @@ def get_varlen_pool_list(embedding_dict,features,varlen_sparse_feature_columns,t
     if to_list:
         return list(chain.from_iterable(pool_vec_list.values()))
     return pool_vec_list
+
+def mergeDict(a,b):
+    '''
+    extend 在list后面 一次性添加多个值
+    :param a:
+    :param b:
+    :return:
+    '''
+    c=defaultdict(list)
+    for k,v in a.items():
+        c[k].extend(v)
+    for k,v in b.items():
+        c[k].extend(v)
+    return c
 
 
 

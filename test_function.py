@@ -7,19 +7,25 @@ from tensorflow.python.keras import metrics
 from tensorflow.python.keras.models import load_model
 from tensorflow.train import Checkpoint
 from tensorflow import trainable_variables
+from deepfm import DeepFM
 
 
 folder = r"D:\Amozon_data_set"
 
 
-def get_xy_fd():
-    feature_columns = [SparseFeat('user', 3, embedding_dim=10), SparseFeat(
-        'gender', 2, embedding_dim=4), SparseFeat('item_id', 3 + 1, embedding_dim=8),
-                       SparseFeat('cate_id', 2 + 1, embedding_dim=4), DenseFeat('pay_score', 1)]
+def get_xy_fd(method):
+    '''
+
+    :param method: 目前支持的测试 DeepFM和DIN
+    :return:
+    '''
+    feature_columns = [SparseFeat('user', 3, embedding_dim=8), SparseFeat(
+        'gender', 2, embedding_dim=8), SparseFeat('item_id', 3 + 1, embedding_dim=8),
+                       SparseFeat('cate_id', 2 + 1, embedding_dim=8), DenseFeat('pay_score', 1)]
     feature_columns += [
         VarLenSparseFeat(SparseFeat('hist_item_id', vocabulary_size=3 + 1, embedding_dim=8, embedding_name='item_id'),
                          maxlen=4, length_name="seq_length"),
-        VarLenSparseFeat(SparseFeat('hist_cate_id', 2 + 1, embedding_dim=4, embedding_name='cate_id'), maxlen=4,
+        VarLenSparseFeat(SparseFeat('hist_cate_id', 2 + 1, embedding_dim=8, embedding_name='cate_id'), maxlen=4,
                          length_name="seq_length")]
     # Notice: History behavior sequence feature name must start with "hist_".
     behavior_feature_list = ["item_id", "cate_id"]
@@ -38,9 +44,13 @@ def get_xy_fd():
                     'pay_score': pay_score, 'seq_length': seq_length}
     x = {name: feature_dict[name] for name in get_feature_names(feature_columns)}
     y = np.array([1, 0, 1])
+    if method=='DeepFM':
+        behavior_feature_list=[SparseFeat('user', 3, embedding_dim=10), SparseFeat(
+        'gender', 2, embedding_dim=4), SparseFeat('item_id', 3 + 1, embedding_dim=8),
+                       SparseFeat('cate_id', 2 + 1, embedding_dim=4), DenseFeat('pay_score', 1)]
     return x, y, feature_columns, behavior_feature_list
 
-def get_config():
+def get_config(method):
     with open(folder + r"/dataset.pkl", 'rb') as f:
         train_set=pickle.load(f)
         test_set=pickle.load(f)
@@ -59,6 +69,8 @@ def get_config():
     feature_columns=[SparseFeat('reviewerID',user_count,embedding_dim=32),SparseFeat('asin',item_count,embedding_dim=32)]
     feature_columns+=[VarLenSparseFeat(SparseFeat('hist_asin',item_count,embedding_dim=32,embedding_name='hist_asin'),maxlen=max_len,length_name="length_name")]
     behaviour_list=['asin']
+    if method=='DeepFM':
+        behaviour_list=[SparseFeat('asin',item_count,embedding_dim=32)]
     return X,y,feature_columns,behaviour_list
 
 
@@ -78,6 +90,18 @@ def test_DIN():
     history = model.fit(x, y, verbose=1, epochs=1, validation_split=0.1,batch_size=64)
     #model.save_weights(folder+r'/param/my_model')
     '''
+
+def test_DeepFM():
+    x, y, feature_columns, behavior_feature_list = get_config('DeepFM')#get_xy_fd('DeepFM')
+
+
+    model=DeepFM(behavior_feature_list,feature_columns)
+    model.load_weights(folder + r'/param/DeepFM')
+    model.compile('adam', 'binary_crossentropy',
+                  metrics=[metrics.binary_accuracy])
+
+    history = model.fit(x, y, verbose=1, epochs=1, validation_split=0.1, batch_size=64)
+    model.save_weights(folder + r'/param/DeepFM')
 
 
 
