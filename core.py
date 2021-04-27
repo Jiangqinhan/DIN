@@ -207,6 +207,8 @@ class PredictionLayer(Layer):
         if self.task == "binary":
             x = tf.sigmoid(x)
 
+        output = tf.reshape(x, (-1, 1))
+
         return x
 
 

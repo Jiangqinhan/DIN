@@ -4,10 +4,10 @@ from din import DIN
 import pickle
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 from tensorflow.python.keras import metrics
+import tensorflow as tf
 from tensorflow.python.keras.models import load_model
-from tensorflow.train import Checkpoint
-from tensorflow import trainable_variables
 from deepfm import DeepFM
+from tensorflow.python.keras import backend as K
 
 
 folder = r"D:\Amozon_data_set"
@@ -45,9 +45,9 @@ def get_xy_fd(method):
     x = {name: feature_dict[name] for name in get_feature_names(feature_columns)}
     y = np.array([1, 0, 1])
     if method=='DeepFM':
-        behavior_feature_list=[SparseFeat('user', 3, embedding_dim=10), SparseFeat(
+        behavior_feature_list=[SparseFeat('user', 3, embedding_dim=8), SparseFeat(
         'gender', 2, embedding_dim=4), SparseFeat('item_id', 3 + 1, embedding_dim=8),
-                       SparseFeat('cate_id', 2 + 1, embedding_dim=4), DenseFeat('pay_score', 1)]
+                       SparseFeat('cate_id', 2 + 1, embedding_dim=8), DenseFeat('pay_score', 1)]
     return x, y, feature_columns, behavior_feature_list
 
 def get_config(method):
@@ -78,10 +78,6 @@ def test_DIN():
     x, y, feature_columns, behavior_feature_list = get_xy_fd()# get_config()
     print('?????????')
     model = DIN(feature_columns, behavior_feature_list)
-    t_vars = trainable_variables()
-    for var in t_vars:
-        print(var.name)
-    model.summary()
     '''
     model.load_weights(folder+r'/param/my_model')
     model.compile('adam', 'binary_crossentropy',
@@ -90,9 +86,39 @@ def test_DIN():
     history = model.fit(x, y, verbose=1, epochs=1, validation_split=0.1,batch_size=64)
     #model.save_weights(folder+r'/param/my_model')
     '''
+def auc(y_true, y_pred):
+    '''
+    ptas = tf.stack([binary_PTA(y_true,y_pred,k) for k in np.linspace(0, 1, 1000)],axis=0)
+    pfas = tf.stack([binary_PFA(y_true,y_pred,k) for k in np.linspace(0, 1, 1000)],axis=0)
+    pfas = tf.concat([tf.ones((1,)) ,pfas],axis=0)
+    binSizes = -(pfas[1:]-pfas[:-1])
+    s = ptas*binSizes
+    return K.sum(s, axis=0)
+    '''
+    y_true=y_true.to
+    return auc
+#-----------------------------------------------------------------------------------------------------------------------------------------------------
+# PFA, prob false alert for binary classifier
+def binary_PFA(y_true, y_pred, threshold=K.variable(value=0.5)):
+    y_pred = K.cast(y_pred >= threshold, 'float32')
+    # N = total number of negative labels
+    N = K.sum(1 - y_true)
+    # FP = total number of false alerts, alerts from the negative class labels
+    FP = K.sum(y_pred - y_pred * y_true)
+    return FP/N
+#-----------------------------------------------------------------------------------------------------------------------------------------------------
+# P_TA prob true alerts for binary classifier
+def binary_PTA(y_true, y_pred, threshold=K.variable(value=0.5)):
+    y_pred = K.cast(y_pred >= threshold, 'float32')
+    # P = total number of positive labels
+    P = K.sum(y_true)
+    # TP = total number of correct alerts, alerts from the positive class labels
+    TP = K.sum(y_pred * y_true)
+    return TP/P
 
+'''
 def test_DeepFM():
-    x, y, feature_columns, behavior_feature_list = get_config('DeepFM')#get_xy_fd('DeepFM')
+    x, y, feature_columns, behavior_feature_list =get_xy_fd('DeepFM') #get_config('DeepFM')
 
 
     model=DeepFM(behavior_feature_list,feature_columns)
@@ -102,7 +128,18 @@ def test_DeepFM():
 
     history = model.fit(x, y, verbose=1, epochs=1, validation_split=0.1, batch_size=64)
     model.save_weights(folder + r'/param/DeepFM')
+'''
+def test_DeepFM():
+    x, y, feature_columns, behavior_feature_list =get_xy_fd('DeepFM') #get_config('DeepFM')
 
+
+    model=DeepFM(behavior_feature_list,feature_columns)
+    #model.load_weights(folder + r'/param/DeepFM')
+    model.compile('adam', 'binary_crossentropy',
+                  metrics=[metrics.binary_accuracy])
+
+    history = model.fit(x, y, verbose=1, epochs=1, validation_split=0.1, batch_size=64)
+    #model.save_weights(folder + r'/param/DeepFM')
 
 
 

@@ -3,6 +3,8 @@ import pickle
 import numpy as np
 import random
 from test_function import test_DIN,test_DeepFM
+import time
+import tensorflow as tf
 
 if __name__ == "__main__":
 
@@ -19,6 +21,7 @@ if __name__ == "__main__":
     meta_df=meta_df.reset_index(drop=True)
     with open(folder+r'\meta.pkl','wb') as f:
         pickle.dump(meta_df,f,pickle.HIGHEST_PROTOCOL)
+
     with open(folder+r"\reviews.pkl","rb") as f:
         reviews_df=pickle.load(f)
         #选取三列 分别为用户id 商品id 和时间戳
@@ -42,7 +45,9 @@ if __name__ == "__main__":
     reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
     reviews_df = reviews_df.reset_index(drop=True)
     reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
+    #cate_list 物品的标签列表
     cate_list = np.array(meta_df['categories'], dtype='int32')
+
     with open(folder+r"/remap.pkl",'wb') as f:
         pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL)  # uid, iid
         pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)  # cid of iid line
@@ -50,11 +55,12 @@ if __name__ == "__main__":
                     f, pickle.HIGHEST_PROTOCOL)
         pickle.dump((asin_key, cate_key, revi_key), f, pickle.HIGHEST_PROTOCOL)
 
-
+ 
     with open(folder+r'/remap.pkl','rb') as f:
         reviews_df=pickle.load(f)
         cate_list=pickle.load(f)
         user_count,item_count,cate_count,example_count=pickle.load(f)
+
 
     train_set=[]
     test_set=[]
@@ -84,9 +90,12 @@ if __name__ == "__main__":
         pickle.dump(test_set, f, pickle.HIGHEST_PROTOCOL)
         pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
         pickle.dump((user_count, item_count, cate_count), f, pickle.HIGHEST_PROTOCOL)
-    '''
+   '''
     #test_DIN()
+    start_time=time.time()
     test_DeepFM()
+    print('time cost {}'.format(time.time()-start_time))
+
 
 
 
