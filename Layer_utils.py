@@ -67,7 +67,7 @@ class _Linear_:
         if len(args) == 1:
             res = math_ops.matmul(args[0], self.weight)
         else:
-            res = math_ops.matmul(array_ops.concat(args), self.weight)
+            res = math_ops.matmul(array_ops.concat(args,axis=1), self.weight)
         if self.build_bias:
             res = nn_ops.bias_add(res, self.bias)
         return res
@@ -175,6 +175,10 @@ class AUCRUCell(RNNCell):
     @property
     def output_size(self):
         return self._num_units
+
+    def __call__(self, inputs, state, att_score):
+
+        return self.call(inputs, state, att_score)
 
     def call(self, inputs, state, att_score=None):
         """Gated recurrent unit (GRU) with nunits cells."""

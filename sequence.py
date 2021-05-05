@@ -304,7 +304,7 @@ class DynamicGRU(Layer):
     :return:
     '''
 
-    def __int__(self, num_units=None, return_sequence=True, gru_type="GRU", **kwargs):
+    def __init__(self, num_units=None, return_sequence=True, gru_type="GRU", **kwargs):
 
         self.num_units = num_units
         self.return_sequence = return_sequence
@@ -339,11 +339,13 @@ class DynamicGRU(Layer):
         else:
             rnn_input, sequence_length = input_list
             att_score = None
-        rnn_output, final_state = dynamic_rnn(self.gru_cell, rnn_input, sequence_length, att_score)
+        #squeeze是dynamic_rnn的要求
+        rnn_output, final_state = dynamic_rnn(self.gru_cell, rnn_input,att_score,
+                                              tf.squeeze(sequence_length,) ,dtype=tf.float32,scope=self.name)
         if self.return_sequence:
             return rnn_output
         else:
-            return final_state
+            return tf.expand_dims(final_state,axis=1)
 
     def compute_output_shape(self, input_shape):
         rnn_input_shape = input_shape[0]

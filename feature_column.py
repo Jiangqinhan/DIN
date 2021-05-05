@@ -18,6 +18,7 @@ class SparseFeat(
     '''
     不允许给对象增加新的属性
     group_name 决定是否参与某些操作,例如在deepfm中,决定是否参加fm的内积运算
+    embedding_name 非常重要,掌管embedding层的复用例如 query和key 用的是同一个embedding层
     '''
     __slots__ = ()
 

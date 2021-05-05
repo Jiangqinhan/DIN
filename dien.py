@@ -6,7 +6,7 @@ from utils import concat_func
 from core import DNN, PredictionLayer
 from utils import NoMask, combine_dnn_input, reduce_sum, reduce_mean
 from sequence import AttentionSequencePoolingLayer, DynamicGRU
-from tensorflow.python.keras.layers import Dense
+from tensorflow.python.keras.layers import Dense,Permute
 
 
 def auxiliary_loss(h_state, click_sequence, no_click_sequence, mask, stag):
@@ -32,6 +32,48 @@ def auxiliary_loss(h_state, click_sequence, no_click_sequence, mask, stag):
     # 不指定维数就将所有的元素相加求平均
     return reduce_mean(postive + neg)
 
+def auxiliary_loss1(h_states, click_seq, noclick_seq, mask, stag=None):
+    #:param h_states:
+    #:param click_seq:
+    #:param noclick_seq: #[B,T-1,E]
+    #:param mask:#[B,1]
+    #:param stag:
+    #:return:
+    hist_len, _ = click_seq.get_shape().as_list()[1:]
+    mask = tf.sequence_mask(mask, hist_len)
+    mask = mask[:, 0, :]
+
+    mask = tf.cast(mask, tf.float32)
+
+    click_input_ = tf.concat([h_states, click_seq], -1)
+
+    noclick_input_ = tf.concat([h_states, noclick_seq], -1)
+
+    auxiliary_nn = DNN([100, 50, 1], activation='sigmoid')
+
+    click_prop_ = auxiliary_nn(click_input_, stag=stag)[:, :, 0]
+
+    noclick_prop_ = auxiliary_nn(noclick_input_, stag=stag)[
+                    :, :, 0]  # [B,T-1]
+
+    try:
+        click_loss_ = - tf.reshape(tf.log(click_prop_),
+                                   [-1, tf.shape(click_seq)[1]]) * mask
+    except:
+        click_loss_ = - tf.reshape(tf.compat.v1.log(click_prop_),
+                                   [-1, tf.shape(click_seq)[1]]) * mask
+    try:
+        noclick_loss_ = - \
+                            tf.reshape(tf.log(1.0 - noclick_prop_),
+                                       [-1, tf.shape(noclick_seq)[1]]) * mask
+    except:
+        noclick_loss_ = - \
+                            tf.reshape(tf.compat.v1.log(1.0 - noclick_prop_),
+                                       [-1, tf.shape(noclick_seq)[1]]) * mask
+
+    loss_ = reduce_mean(click_loss_ + noclick_loss_)
+
+    return loss_
 
 def interest_extraction_and_evolution(concat_behaviour, deep_input_item, user_behaviour_length, gru_type, use_neg=False,
                                       neg_concat_behaviour=None, att_hidden_size=(64, 16), att_activation='sigmoid',
@@ -61,7 +103,7 @@ def interest_extraction_and_evolution(concat_behaviour, deep_input_item, user_be
         (concat_behaviour, user_behaviour_length))
     if use_neg:
         # 特别注意 要把对应关系搞清楚 在论文中h_t 对应 e_(t+1)
-        aux_loss = auxiliary_loss(rnn_output[:, :-1, :], deep_input_item[:, 1:, :], neg_concat_behaviour[:, 1:, :],
+        aux_loss = auxiliary_loss(rnn_output[:, :-1, :], concat_behaviour[:, 1:, :], neg_concat_behaviour[:, 1:, :],
                                   user_behaviour_length, stag='gru')
     # evolution
     if gru_type == 'GRU':
@@ -75,10 +117,10 @@ def interest_extraction_and_evolution(concat_behaviour, deep_input_item, user_be
                                                   weight_normalization=att_weight_normalization, return_score=True)(
             [deep_input_item, rnn_output, user_behaviour_length])
         if gru_type == 'AIGRU':
-            rnn_output = att_score * rnn_output
-            hist = DynamicGRU(embedding_size, return_sequence=False, name='gru2')([rnn_output, user_behaviour_length])
+            rnn_output = Permute([2,1])(att_score) * rnn_output
+            hist = DynamicGRU(embedding_size,gru_type=gru_type, return_sequence=False, name='gru2')([rnn_output, user_behaviour_length])
         else:
-            hist = DynamicGRU(embedding_size, return_sequence=False, name='gru2')([rnn_output, user_behaviour_length])
+            hist = DynamicGRU(embedding_size,gru_type=gru_type, return_sequence=False, name='gru2')([rnn_output, user_behaviour_length,Permute([2,1])(att_score)])
     return hist, aux_loss
 
 
@@ -173,5 +215,9 @@ def DIEN(dnn_feature_columns, history_feature_list,
     final_logit = PredictionLayer(task)(final_logit)
     model = tf.keras.models.Model(inputs=input_list, outputs=final_logit)
     if use_negsampling:
-        model.add_loss(alpha * aux_loss)
+        model.add_loss(-alpha * aux_loss)
+    try:
+        tf.keras.backend.get_session().run(tf.global_variables_initializer())
+    except:
+        tf.compat.v1.keras.backend.get_session().run(tf.compat.v1.global_variables_initializer())
     return model
