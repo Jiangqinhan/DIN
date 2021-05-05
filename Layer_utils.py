@@ -9,7 +9,17 @@ from tensorflow.python.util import nest
 _BIAS_VARIABLE_NAME = "bias"
 
 _WEIGHTS_VARIABLE_NAME = "kernel"
+'''
+关于变量共享
+https://www.jianshu.com/p/ab0d38725f88
+True: 参数空间使用reuse 模式，即该空间下的所有tf.get_variable()函数将直接获取已经创建的变量，如果参数不存在tf.get_variable()函数将会报错。
 
+AUTO_REUSE：若参数空间的参数不存在就创建他们，如果已经存在就直接获取它们。
+
+None 或者False 这里创建函数tf.get_variable()函数只能创建新的变量，当同名变量已经存在时，函数就报错
+
+
+'''
 
 class _Linear_:
     def __init__(self, args, output_size, build_bias, bias_initializer=None, kernel_initializer=None):
@@ -107,6 +117,10 @@ class AGRUCell(RNNCell):
     def output_size(self):
         return self.num_units
 
+    def __call__(self, inputs, state, att_score):
+
+        return self.call(inputs, state, att_score)
+
     def call(self, input, state, att_score=None):
         '''
 
@@ -177,6 +191,10 @@ class AUCRUCell(RNNCell):
         return self._num_units
 
     def __call__(self, inputs, state, att_score):
+        '''
+        __call__会调用call
+        父类RNNCELL的__call__所做的就是选定variable_scope在scope中调用layer的__call__
+        '''
 
         return self.call(inputs, state, att_score)
 

@@ -6,7 +6,7 @@ from utils import concat_func
 from core import DNN, PredictionLayer
 from utils import NoMask, combine_dnn_input, reduce_sum, reduce_mean
 from sequence import AttentionSequencePoolingLayer, DynamicGRU
-from tensorflow.python.keras.layers import Dense,Permute
+from tensorflow.python.keras.layers import Dense,Permute,multiply
 
 
 def auxiliary_loss(h_state, click_sequence, no_click_sequence, mask, stag):
@@ -89,9 +89,12 @@ def interest_extraction_and_evolution(concat_behaviour, deep_input_item, user_be
     :param att_hidden_size:
     :param att_activation:
     :param att_weight_normalization:
-    extraction统一使用grue
+    extraction统一使用gru
     在evolution部分 如果使用gru 则 再进行一个gru层然后使用sequence_attention进行计算出最终的h
     其他情况下 调用相应的gru 并且将att_score传入其中
+    下面用到permute的原因是att_score的格式为[batch_size,input_length,1]需要转换一下再相乘,这里乘法
+    keras模式必须用层api,
+    解决方法可以用 Lambda层去快速定义一个层
     :return: final_state [batch_size,1,embedding_size]   loss
     '''
     if gru_type not in ["GRU", "AIGRU", "AGRU", "AUGRU"]:
@@ -117,7 +120,7 @@ def interest_extraction_and_evolution(concat_behaviour, deep_input_item, user_be
                                                   weight_normalization=att_weight_normalization, return_score=True)(
             [deep_input_item, rnn_output, user_behaviour_length])
         if gru_type == 'AIGRU':
-            rnn_output = Permute([2,1])(att_score) * rnn_output
+            rnn_output = multiply([rnn_output,Permute([2,1])(att_score) ])
             hist = DynamicGRU(embedding_size,gru_type=gru_type, return_sequence=False, name='gru2')([rnn_output, user_behaviour_length])
         else:
             hist = DynamicGRU(embedding_size,gru_type=gru_type, return_sequence=False, name='gru2')([rnn_output, user_behaviour_length,Permute([2,1])(att_score)])
