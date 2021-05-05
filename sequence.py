@@ -6,6 +6,8 @@ from tensorflow.python.keras.initializers import TruncatedNormal
 from tensorflow.python.keras.layers import LSTM, Lambda, Layer
 from utils import reduce_max, reduce_mean, reduce_sum, div, softmax
 from core import LocalActivationUnit
+from Layer_utils import AGRUCell, AUCRUCell
+from rnn import dynamic_rnn
 
 
 class SequencePoolingLayer(Layer):
@@ -247,30 +249,30 @@ class AttentionSequencePoolingLayer(Layer):
         self.local_att = LocalActivationUnit(self.att_hidden_units, self.att_activation, l2_reg=0, dropout_rate=0,
                                              use_bn=False, seed=1024)
 
-    def call(self,inputs,mask=None,training=None,**kwargs):
+    def call(self, inputs, mask=None, training=None, **kwargs):
         # query is a 3D tensor with shape:  ``(batch_size, 1, embedding_size)
         if self.supports_masking:
             if mask is None:
                 raise ValueError(
                     "When supports_masking=True,input must support masking")
-            queries,keys=inputs
-            key_masking=tf.expand_dims(mask[-1],axis=1)
+            queries, keys = inputs
+            key_masking = tf.expand_dims(mask[-1], axis=1)
         else:
-            queries,keys,keys_length=inputs
-            hist_len=keys.shape[1]
-            key_masking=tf.sequence_mask(keys_length,hist_len)
+            queries, keys, keys_length = inputs
+            hist_len = keys.shape[1]
+            key_masking = tf.sequence_mask(keys_length, hist_len)
 
-        attention_score=self.local_att([queries,keys],training=training)
+        attention_score = self.local_att([queries, keys], training=training)
         outputs = tf.transpose(attention_score, (0, 2, 1))
         if self.weight_normalization:
-            paddings=tf.ones_like(outputs)* (-2 ** 32 + 1)
+            paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
         else:
-            paddings=tf.zeros_like(outputs)
-        outputs=tf.where(key_masking,outputs,paddings)
+            paddings = tf.zeros_like(outputs)
+        outputs = tf.where(key_masking, outputs, paddings)
         if self.weight_normalization:
-            outputs=softmax(outputs)
+            outputs = softmax(outputs)
         if not self.return_score:
-            outputs=tf.matmul(outputs,keys)
+            outputs = tf.matmul(outputs, keys)
 
         return outputs
 
@@ -279,10 +281,9 @@ class AttentionSequencePoolingLayer(Layer):
 
     def compute_output_shape(self, input_shape):
         if self.return_score:
-            return (None,1,input_shape[1][1])
+            return (None, 1, input_shape[1][1])
         else:
-            return  (None,1,input_shape[0][-1])
-
+            return (None, 1, input_shape[0][-1])
 
     def get_config(self, ):
 
@@ -293,4 +294,65 @@ class AttentionSequencePoolingLayer(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class DynamicGRU(Layer):
+    '''
 
+    :param num_units: 通常用于表示输出的维数state 和 output的维数
+    :param gru_type: "GRU", "AIGRU", "AGRU", "AUGRU"
+    :param return_sequence: 返回output list  或者是 最终的state
+    :param kwargs:
+    :return:
+    '''
+
+    def __int__(self, num_units=None, return_sequence=True, gru_type="GRU", **kwargs):
+
+        self.num_units = num_units
+        self.return_sequence = return_sequence
+        self.gru_type = gru_type
+        super(DynamicGRU, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        '''
+         self.num_units 默认为 embedding_size
+        :param input_shape:
+        :return:
+        '''
+        if self.num_units is None:
+            self.num_units = input_shape[0][-1]
+        if self.gru_type == 'AGRU':
+            self.gru_cell = AGRUCell(self.num_units)
+        elif self.gru_type == 'AUGRU':
+            self.gru_cell = AUCRUCell(self.num_units)
+        else:
+            self.gru_cell = tf.nn.rnn_cell.GRUCell(self.num_units)
+
+        super(DynamicGRU, self).build(input_shape)
+
+    def call(self, input_list):
+        '''
+
+        :param input_list: shape[batch_size,field_size,embedding_size], sequence_length用于表示迭代次数,att_score,[batch_size,field_size,1]
+        :return:output [batch_size,field_size,embedding_size] 或者finial_state: batch_size,embedding_size
+        '''
+        if self.gru_type == 'AUGRU' or self.gru_type == 'AGRU':
+            rnn_input, sequence_length, att_score = input_list
+        else:
+            rnn_input, sequence_length = input_list
+            att_score = None
+        rnn_output, final_state = dynamic_rnn(self.gru_cell, rnn_input, sequence_length, att_score)
+        if self.return_sequence:
+            return rnn_output
+        else:
+            return final_state
+
+    def compute_output_shape(self, input_shape):
+        rnn_input_shape = input_shape[0]
+        if self.return_sequence:
+            return rnn_input_shape
+        else:
+            return (None, 1, rnn_input_shape[-1])
+
+    def get_config(self, ):
+        config = {'num_units': self.num_units, 'gru_type': self.gru_type, 'return_sequence': self.return_sequence}
+        base_config = super(DynamicGRU, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
