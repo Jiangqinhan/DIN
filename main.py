@@ -8,7 +8,8 @@ import tensorflow as tf
 from utils import reduce_sum
 
 if __name__ == "__main__":
-
+    if tf.__version__ >= '2.0.0':
+        tf.compat.v1.disable_eager_execution()
     folder=r"D:\Amozon_data_set"
     '''
     reviews_Electronics=folder+r"\Electronics_5.json"
@@ -109,7 +110,7 @@ if __name__ == "__main__":
     print(1/(np.exp(-2.3)+1))
 
     '''
-    test_dien()
+    test_DeepFM()
 
 
 

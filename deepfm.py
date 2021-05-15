@@ -34,9 +34,14 @@ def DeepFM(linear_feature_columns,dnn_feature_columns,fm_group=[DEFAULT_GROUP_NA
     dnn_output=DNN(dnn_hidden_units,dnn_activation,l2_dnn_reg,dnn_dropout_rate,dnn_use_bn,seed=seed)(dnn_input)
     dnn_logit=tf.keras.layers.Dense(1,use_bias=False,kernel_initializer=tf.keras.initializers.glorot_normal(seed=seed))(dnn_output)
     #实现fm部分
+    fm_logit=None
     linear_logit=get_linear_logit(features,linear_feature_columns,seed=seed,prefix='linear',l2_reg=l2_reg_linear)
-    fm_logit = add_func([FM()(concat_func(v,axis=1)) for k,v in  group_embedding_dict.items() if k in fm_group])
+    fm_logit = add_func([FM()(concat_func(v, axis=1))
+                         for k, v in group_embedding_dict.items() if k in fm_group])
+
     #求和
+    linear_logit=tf.expand_dims(linear_logit,axis=0)
+    dnn_logit=tf.expand_dims(dnn_logit,axis=0)
     final_logit=add_func([linear_logit,fm_logit,dnn_logit])
 
     output=PredictionLayer(task)(final_logit)

@@ -282,3 +282,9 @@ class Add(tf.keras.layers.Layer):
 
 def add_func(inputs):
     return  Add()(inputs)
+
+def log(input):
+    try:
+        return tf.log(input)
+    except AttributeError:
+        return tf.math.log(input)

@@ -9,12 +9,14 @@ from tensorflow.python.keras.models import load_model
 from deepfm import DeepFM
 from tensorflow.python.keras import backend as K
 from dien import DIEN
+#from deepctr.models import DeepFM
+#from deepctr.feature_column import SparseFeat, VarLenSparseFeat, DenseFeat, get_feature_names
 
 
 folder = r"D:\Amozon_data_set"
 
 
-def get_xy_fd(method):
+def get_xy_fd(method=None):
     '''
 
     :param method: 目前支持的测试 DeepFM和DIN
@@ -51,7 +53,7 @@ def get_xy_fd(method):
                        SparseFeat('cate_id', 2 + 1, embedding_dim=8), DenseFeat('pay_score', 1)]
     return x, y, feature_columns, behavior_feature_list
 
-def get_config(method):
+def get_config(method=None):
     with open(folder + r"/dataset.pkl", 'rb') as f:
         train_set=pickle.load(f)
         test_set=pickle.load(f)
@@ -76,17 +78,17 @@ def get_config(method):
 
 
 def test_DIN():
-    x, y, feature_columns, behavior_feature_list = get_xy_fd()# get_config()
+    x, y, feature_columns, behavior_feature_list = get_config()# get_xy_fd()
     print('?????????')
     model = DIN(feature_columns, behavior_feature_list)
-    '''
+
     model.load_weights(folder+r'/param/my_model')
     model.compile('adam', 'binary_crossentropy',
                   metrics=[metrics.binary_accuracy])
 
     history = model.fit(x, y, verbose=1, epochs=1, validation_split=0.1,batch_size=64)
-    #model.save_weights(folder+r'/param/my_model')
-    '''
+    model.save_weights(folder+r'/param/my_model')
+
 def auc(y_true, y_pred):
     '''
     ptas = tf.stack([binary_PTA(y_true,y_pred,k) for k in np.linspace(0, 1, 1000)],axis=0)

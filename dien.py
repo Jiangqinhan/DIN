@@ -2,7 +2,7 @@ import tensorflow as tf
 from feature_column import build_input_features, SparseFeat, VarLenSparseFeat, DenseFeat
 from inputs import create_embedding_matrix, embedding_lookup, get_dense_input, get_varlen_pool_list, \
     varlen_embedding_lookup
-from utils import concat_func
+from utils import concat_func,log
 from core import DNN, PredictionLayer
 from utils import NoMask, combine_dnn_input, reduce_sum, reduce_mean
 from sequence import AttentionSequencePoolingLayer, DynamicGRU
@@ -27,8 +27,8 @@ def auxiliary_loss(h_state, click_sequence, no_click_sequence, mask, stag):
     neg_mul = h_state * no_click_sequence
     postive_inner_product = reduce_sum(postive_mul, axis=2) * mask
     neg_inner_product = reduce_sum(neg_mul, axis=2) * mask
-    postive = tf.log(tf.sigmoid(postive_inner_product))
-    neg = tf.log(1.0 - tf.sigmoid(neg_inner_product))
+    postive = log(tf.sigmoid(postive_inner_product))
+    neg = log(1.0 - tf.sigmoid(neg_inner_product))
     # 不指定维数就将所有的元素相加求平均
     return reduce_mean(postive + neg)
 

@@ -7,7 +7,10 @@ from tensorflow.python.keras.layers import LSTM, Lambda, Layer
 from utils import reduce_max, reduce_mean, reduce_sum, div, softmax
 from core import LocalActivationUnit
 from Layer_utils import AGRUCell, AUCRUCell
-from rnn import dynamic_rnn
+if tf.__version__ >= '2.0.0':
+    from rnn_v2 import dynamic_rnn
+else:
+    from rnn import dynamic_rnn
 
 
 class SequencePoolingLayer(Layer):
@@ -324,7 +327,10 @@ class DynamicGRU(Layer):
         elif self.gru_type == 'AUGRU':
             self.gru_cell = AUCRUCell(self.num_units)
         else:
-            self.gru_cell = tf.nn.rnn_cell.GRUCell(self.num_units)
+            try:
+                self.gru_cell = tf.nn.rnn_cell.GRUCell(self.num_units)
+            except:
+                self.gru_cell = tf.compat.v1.nn.rnn_cell.GRUCell(self.num_units)
 
         super(DynamicGRU, self).build(input_shape)
 
