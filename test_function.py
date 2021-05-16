@@ -54,6 +54,7 @@ def get_xy_fd(method=None):
     return x, y, feature_columns, behavior_feature_list
 
 def get_config(method=None):
+    #论文数据集http://jmcauley.ucsd.edu/data/amazon/
     with open(folder + r"/dataset.pkl", 'rb') as f:
         train_set=pickle.load(f)
         test_set=pickle.load(f)
@@ -62,29 +63,34 @@ def get_config(method=None):
     #label和其他相关的数据
     y=np.array([sample[-1] for sample in train_set])
     reviewerID=np.array([sample[0] for sample in train_set])
-    asin=np.array([sample[-2] for sample in train_set])
-    seq_length=np.array([len(sample[1])for sample in train_set])
+    asin=np.array([sample[-2][0] for sample in train_set])
+    category=np.array([sample[-2][1] for sample in train_set])
+    seq_length=np.array([len(sample[1][0])for sample in train_set])
     max_len=np.max(seq_length)
-    hist_asin=[sample[1] for sample in train_set]
+    hist_asin=[sample[1][0] for sample in train_set]
+    hist_category=[sample[1][1] for sample in train_set]
     hist_asin=pad_sequences(hist_asin,padding='post',value=0)
-    X={'reviewerID':reviewerID,'asin':asin,'hist_asin':hist_asin,'length_name':seq_length}
+    hist_category=pad_sequences(hist_category,padding='post',value=0)
+    X = {'reviewerID': reviewerID, 'asin': asin, 'category': category, 'hist_asin': hist_asin,
+         'length_name': seq_length, 'hist_category': hist_category}
 
-    feature_columns=[SparseFeat('reviewerID',user_count,embedding_dim=32),SparseFeat('asin',item_count,embedding_dim=32)]
-    feature_columns+=[VarLenSparseFeat(SparseFeat('hist_asin',item_count,embedding_dim=32,embedding_name='hist_asin'),maxlen=max_len,length_name="length_name")]
-    behaviour_list=['asin']
+    feature_columns=[SparseFeat('reviewerID',user_count,embedding_dim=32),SparseFeat('asin',item_count,embedding_dim=32),SparseFeat('category',cate_count,embedding_dim=32)]
+    feature_columns+=[VarLenSparseFeat(SparseFeat('hist_asin',item_count,embedding_dim=32,embedding_name='hist_asin'),maxlen=max_len,length_name="length_name"),
+                      VarLenSparseFeat(SparseFeat('hist_category',cate_count,embedding_dim=32,embedding_name='hist_cate'),maxlen=max_len,length_name='length_name')]
+    behaviour_list=['asin','category']
     if method=='DeepFM':
         behaviour_list=[SparseFeat('asin',item_count,embedding_dim=32)]
     return X,y,feature_columns,behaviour_list
 
 
 def test_DIN():
-    x, y, feature_columns, behavior_feature_list = get_config()# get_xy_fd()
+    x, y, feature_columns, behavior_feature_list =  get_config()#get_xy_fd()
     print('?????????')
     model = DIN(feature_columns, behavior_feature_list)
 
-    model.load_weights(folder+r'/param/my_model')
+    #model.load_weights(folder+r'/param/my_model')
     model.compile('adam', 'binary_crossentropy',
-                  metrics=[metrics.binary_accuracy])
+                  metrics=['AUC'])
 
     history = model.fit(x, y, verbose=1, epochs=1, validation_split=0.1,batch_size=64)
     model.save_weights(folder+r'/param/my_model')
@@ -133,13 +139,13 @@ def test_DeepFM():
     model.save_weights(folder + r'/param/DeepFM')
 '''
 def test_DeepFM():
-    x, y, feature_columns, behavior_feature_list =get_xy_fd('DeepFM') #get_config('DeepFM')
+    x, y, feature_columns, behavior_feature_list = get_config('DeepFM')#get_xy_fd('DeepFM')
 
 
     model=DeepFM(behavior_feature_list,feature_columns)
     #model.load_weights(folder + r'/param/DeepFM')
     model.compile('adam', 'binary_crossentropy',
-                  metrics=[metrics.binary_accuracy])
+                  metrics=['AUC'])
 
     history = model.fit(x, y, verbose=1, epochs=1, validation_split=0.1, batch_size=64)
     #model.save_weights(folder + r'/param/DeepFM')
@@ -199,5 +205,8 @@ def test_dien():
                  dnn_hidden_units=[4, 4, 4], dnn_dropout=0.6, gru_type="AUGRU", use_negsampling=USE_NEG)
     model.summary()
     model.compile('adam', 'binary_crossentropy',
-                  metrics=['binary_crossentropy'])
-    history = model.fit(x, y, verbose=1, epochs=10, validation_split=0.5)
+                  metrics=['AUC'])
+    history = model.fit(x, y, verbose=1, epochs=10, validation_split=0.1)
+
+def test_dien_with_amozon():
+    USE_NEG=False

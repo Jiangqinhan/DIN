@@ -10,95 +10,13 @@ from utils import reduce_sum
 if __name__ == "__main__":
     if tf.__version__ >= '2.0.0':
         tf.compat.v1.disable_eager_execution()
-    folder=r"D:\Amozon_data_set"
     '''
-    reviews_Electronics=folder+r"\Electronics_5.json"
-    meta_Electronics=folder+r"\meta_Electronics.json"
-    
-    reviews_df=to_df(reviews_Electronics)
-    with open(folder+r"\reviews.pkl","wb") as f:
-        pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL)
-    meta_df=to_df(meta_Electronics)
-    meta_df=meta_df[meta_df['asin'].isin(reviews_df['asin'].unique())]
-    meta_df=meta_df.reset_index(drop=True)
-    with open(folder+r'\meta.pkl','wb') as f:
-        pickle.dump(meta_df,f,pickle.HIGHEST_PROTOCOL)
-
-    with open(folder+r"\reviews.pkl","rb") as f:
-        reviews_df=pickle.load(f)
-        #选取三列 分别为用户id 商品id 和时间戳
-        reviews_df=reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
-    with open(folder+r'\meta.pkl','rb') as f:
-        meta_df=pickle.load(f)
-        meta_df=meta_df[['asin','categories']]
-        #类别只保留最后一个
-        meta_df['categories']=meta_df['categories'].map(lambda x:x[-1][-1])
-
-    asin_map,asin_key=build_map(meta_df,'asin')
-    cate_map,cate_key=build_map(meta_df,'categories')
-    revi_map,revi_key=build_map(reviews_df,'reviewerID')
-    user_count, item_count, cate_count, example_count = \
-        len(revi_map), len(asin_map), len(cate_map), reviews_df.shape[0]
-    print('user_count: %d\titem_count: %d\tcate_count: %d\texample_count: %d' %
-          (user_count, item_count, cate_count, example_count))
-    meta_df = meta_df.sort_values('asin')
-    meta_df = meta_df.reset_index(drop=True)
-    reviews_df['asin'] = reviews_df['asin'].map(lambda x: asin_map[x])
-    reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
-    reviews_df = reviews_df.reset_index(drop=True)
-    reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
-    #cate_list 物品的标签列表
-    cate_list = np.array(meta_df['categories'], dtype='int32')
-
-    with open(folder+r"/remap.pkl",'wb') as f:
-        pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL)  # uid, iid
-        pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)  # cid of iid line
-        pickle.dump((user_count, item_count, cate_count, example_count),
-                    f, pickle.HIGHEST_PROTOCOL)
-        pickle.dump((asin_key, cate_key, revi_key), f, pickle.HIGHEST_PROTOCOL)
-
- 
-    with open(folder+r'/remap.pkl','rb') as f:
-        reviews_df=pickle.load(f)
-        cate_list=pickle.load(f)
-        user_count,item_count,cate_count,example_count=pickle.load(f)
-
-
-    train_set=[]
-    test_set=[]
-    print(reviews_df.columns)
-    for reviewerID,hist in reviews_df.groupby('reviewerID'):
-        pos_list=hist['asin'].tolist()
-        def gen_neg():
-            neg=pos_list[0]
-            while neg in pos_list:
-                neg=random.randint(0,item_count-1)
-            return neg
-
-        neg_list=[gen_neg()for i in range(len(pos_list))]
-        for i in range(1,len(pos_list)):
-            hist=pos_list[:i]
-            if i!=len(pos_list)-1:
-                train_set.append((reviewerID,hist,pos_list[i],1))
-                train_set.append((reviewerID,hist,neg_list[i],0))
-            else:
-                test_set.append((reviewerID,hist,pos_list[i],1))
-                test_set.append((reviewerID,hist,neg_list[i],0))
-
-    random.shuffle(train_set)
-    random.shuffle(test_set)
-    with open(folder+r"/dataset.pkl",'wb') as f:
-        pickle.dump(train_set,f,pickle.HIGHEST_PROTOCOL)
-        pickle.dump(test_set, f, pickle.HIGHEST_PROTOCOL)
-        pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
-        pickle.dump((user_count, item_count, cate_count), f, pickle.HIGHEST_PROTOCOL)
-
     #test_DIN()
     start_time=time.time()
     test_DeepFM()
     print('time cost {}'.format(time.time()-start_time))
 
-    
+
     a=tf.constant([0.1,0.2,0.3,0.4,0.5,0.6],shape=[2,3],dtype=tf.float32)
     b=tf.constant([2,6,3,5,8,1],shape=[2,3],dtype=tf.float32)
     res = a*b
@@ -108,9 +26,8 @@ if __name__ == "__main__":
     with tf.Session() as sess:
         print("res_value:", sess.run(res))
     print(1/(np.exp(-2.3)+1))
-
     '''
-    test_DeepFM()
+    test_DIN()
 
 
 
